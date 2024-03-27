@@ -2,8 +2,8 @@
 
 pragma solidity ^0.8.19;
 
-import {VRFCoordinatorV2Interface} from "@chainlink/contracts/src/v0.8/vrf/interfaces/VRFCoordinatorV2Interface.sol";
-import {VRFConsumerBaseV2} from "@chainlink/contracts/src/v0.8/vrf/VRFConsumerBaseV2.sol";
+import {VRFCoordinatorV2Interface} from "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
+import {VRFConsumerBaseV2} from "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 
 /**
  * @title A sample Raffle contract
@@ -54,6 +54,7 @@ contract Raffle is VRFConsumerBaseV2 {
     error Raffle__NotEnoughEthSent();
     error Raffle__TransferFailed();
     error Raffle__RaffleNotOpen();
+    error Raffle__UpkeepNotNeeded(uint256 currentBalance, uint256 numPlayers, uint256 raffleState);
 
     constructor(
         uint256 entranceFee,
@@ -62,7 +63,7 @@ contract Raffle is VRFConsumerBaseV2 {
         bytes32 gasLane,
         uint64 subscriptionId,
         uint32 callbackGasLimit
-    ) VRFConsumerBseV2(vrfCoordinator) public {
+    ) VRFConsumerBaseV2(vrfCoordinator) {
         i_entranceFee = entranceFee;
         i_interval = interval;
         s_lastTimestamp = block.timestamp;
@@ -90,14 +91,17 @@ contract Raffle is VRFConsumerBaseV2 {
 
     /**
      * @notice Function that picks a winner and sends the prize
-     * @dev Function that picks a winner from the ones added to the Raffle in the last period of time and sends the prize to the corresponding address
+     * @dev Function called by the Chainlink Upkeep node.  Picks a winner from the ones added to the Raffle in the last period of time and sends the prize to the corresponding address.
      */
-    function pickWinner() public {
-        // TODO: Be automatically called
-
+    function performUpkeep(bytes calldata /* performData */) external {
         // block.timestamp is in seconds
-        if (block.timestamp - s_lastTimestamp < i_interval) {
-            revert();
+        (bool upkeepNeeded,) = checkUpkeep("");
+        if (upkeepNeeded) {
+            revert Raffle__UpkeepNotNeeded(
+                address(this).balance,
+                s_players.length,
+                uint256(s_raffleState)
+            );
         }
 
         s_raffleState = RaffleState.CALCULATING;
@@ -123,7 +127,7 @@ contract Raffle is VRFConsumerBaseV2 {
     ) internal override {
         // Checks
         // Effects
-        int256 indexOfWinner = randomWords[0] % s_players.length;
+        uint256 indexOfWinner = randomWords[0] % s_players.length;
         address payable winner = s_players[indexOfWinner];
         s_recentWinner = winner;
         s_raffleState = RaffleState.OPEN;
@@ -138,10 +142,28 @@ contract Raffle is VRFConsumerBaseV2 {
     }
 
     /**
+     * @notice Getter function for checkUpkeep functions
+     * @dev Getter function called by the Chainlink automation nodes call to see fi it's time to perform an upkeep
+     */
+    function checkUpkeep(
+        bytes memory /* checkData */
+    ) public view returns (bool upkeepNeeded, bytes memory /* performData */) {
+        upkeepNeeded = s_raffleState == RaffleState.OPEN
+            && (block.timestamp - s_lastTimestamp) >= i_interval
+            && address(this).balance > 0
+            && s_players.length > 0;
+        return (upkeepNeeded, "0x0");
+    }
+
+    /**
      * @notice Getter function for entrance fee
      * @return int256 the entrance fee value for this contract
      */
-    function getEntranceFee() external view returns (int256) {
+    function getEntranceFee() external view returns (uint256) {
         return i_entranceFee;
+    }
+
+    function getRaffleState() external view returns (RaffleState) {
+        return s_raffleState;
     }
 }
