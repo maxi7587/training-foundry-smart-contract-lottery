@@ -21,3 +21,10 @@ Goal is to create a provably random smart contract lottery.
    1. Work on a local chain
    2. Forked Testnet
    3. Forked Mainnet
+
+## Important notes
+
+In order to avoid issues in the Makefile scripts (and some manual), you need to fill this values in your .env file:
+SEPOLIA_RPC_URL=your sepolia RPC URL
+PRIVATE_KEY=your private key
+ETHERSCAN_API_KEY=your etherscan PI key
