@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 
 import {VRFCoordinatorV2Interface} from "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import {VRFConsumerBaseV2} from "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
+import {AutomationCompatibleInterface} from "@chainlink/contracts/src/v0.8/interfaces/AutomationCompatibleInterface.sol";
 
 /**
  * @title A sample Raffle contract
@@ -11,7 +12,7 @@ import {VRFConsumerBaseV2} from "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2
  * @notice This contract is for creating a sample raffle
  * @dev Impements Chainlink VRF v2
  */
-contract Raffle is VRFConsumerBaseV2 {
+contract Raffle is VRFConsumerBaseV2, AutomationCompatibleInterface {
     /** Type declarations */
     enum RaffleState {
         OPEN, // 0
@@ -94,7 +95,7 @@ contract Raffle is VRFConsumerBaseV2 {
      * @notice Function that picks a winner and sends the prize
      * @dev Function called by the Chainlink Upkeep node.  Picks a winner from the ones added to the Raffle in the last period of time and sends the prize to the corresponding address.
      */
-    function performUpkeep(bytes calldata /* performData */) external {
+    function performUpkeep(bytes calldata /* performData */) external override {
         // block.timestamp is in seconds
         (bool upkeepNeeded,) = checkUpkeep("");
         if (!upkeepNeeded) {
@@ -152,7 +153,7 @@ contract Raffle is VRFConsumerBaseV2 {
      */
     function checkUpkeep(
         bytes memory /* checkData */
-    ) public view returns (bool upkeepNeeded, bytes memory /* performData */) {
+    ) public  override view returns (bool upkeepNeeded, bytes memory /* performData */) {
         upkeepNeeded = s_raffleState == RaffleState.OPEN
             && (block.timestamp - s_lastTimestamp) > i_interval
             && s_players.length > 0
