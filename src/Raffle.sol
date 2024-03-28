@@ -49,6 +49,7 @@ contract Raffle is VRFConsumerBaseV2 {
     /** Events */
     event EnterRaffle (address indexed player);
     event PickedWinner (address indexed winner);
+    event RequestRaffleWinner(uint256 indexed requesetId);
 
     /** Errors */
     error Raffle__NotEnoughEthSent();
@@ -113,6 +114,10 @@ contract Raffle is VRFConsumerBaseV2 {
             i_callbackGasLimit, // gas limit for callback
             NUM_WORDS // amount of random words
         );
+
+        // an event with request ID is already emitted by the VRF coordinator
+        // emitting again for training purposes: making a test that requires the output of an event
+        emit RequestRaffleWinner(requestId);
     }
 
     /**
