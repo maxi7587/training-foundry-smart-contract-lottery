@@ -6,6 +6,7 @@ import {Raffle} from "../../src/Raffle.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
 import "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
+import {VRFCoordinatorV2Mock} from "@chainlink/contracts/src/v0.8/mocks/VRFCoordinatorV2Mock.sol";
 
 contract RaffleTest is Test {
     uint256 public constant STARTING_USER_BALANCE = 10 ether;
@@ -173,5 +174,54 @@ contract RaffleTest is Test {
         vm.warp(block.timestamp + interval + 1);
         vm.roll(block.number + 1);
         _;
+    }
+
+    //////////////////////////
+    // Fulfill Random Words //
+    //////////////////////////
+
+    function testFulfillRandomWordsRevertsIfCalledIfCalledBeforePerformUpkeep(
+        uint256 randomRequestId
+    ) public raffleEnterAndTimePassed {
+        // Arrange
+        vm.expectRevert("nonexistent request");
+        VRFCoordinatorV2Mock(vrfCoordinator).fulfillRandomWords(
+            0,
+            address(raffle)
+        );
+    }
+
+    function testFulfillRandomWordsPicksaWinnerResetsAndSendsTheFunds() public raffleEnterAndTimePassed {
+        // Arrange
+        uint256 additionalEntrants = 5;
+        uint256 startingIndex = 1;
+        for (uint256 i = startingIndex; i < startingIndex + additionalEntrants; i++) {
+            address player = address(uint160(i));
+            hoax(player, STARTING_USER_BALANCE); // hoax = prank + deal
+            raffle.enterRaffle{value: entranceFee}();
+        }
+
+        uint256 prize = entranceFee * (additionalEntrants + 1);
+
+        // Act
+        vm.recordLogs();
+        raffle.performUpkeep("");
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+        bytes32 requestId = entries[1].topics[1]; // entries 1 because the request ID is sent twice in the function (for testing purposes)
+        uint256 previousTimestamp = raffle.getLastTimestamp();
+
+        // pretend to be chainlink vrf to pick the random number and call the function
+        VRFCoordinatorV2Mock(vrfCoordinator).fulfillRandomWords(
+            uint256(requestId),
+            address(raffle)
+        );
+
+        // Assert
+        // it's better to have 1 assert pero test, but since this is for training purposes, we can leave it as it is
+        assert(raffle.getRaffleState() == Raffle.RaffleState.OPEN);
+        assert(raffle.getRecentWinner() != address(0));
+        assert(raffle.getPlayers().length == 0);
+        assert(raffle.getLastTimestamp() > previousTimestamp);
+        assert(raffle.getRecentWinner().balance == STARTING_USER_BALANCE + prize - entranceFee);
     }
 }
