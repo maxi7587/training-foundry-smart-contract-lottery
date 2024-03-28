@@ -35,7 +35,7 @@ contract RaffleTest is Test {
             gasLane,
             subscriptionId,
             callbackGasLimit,
-            link
+            link,
         ) = helperConfig.activeNetworkConfig();
         vm.deal(PLAYER, STARTING_USER_BALANCE);
     }
@@ -146,12 +146,20 @@ contract RaffleTest is Test {
 
     function testPerformUpkeepRevertsIfCheckUpkeepIsFalse() public {
         // Arrange
-        uint256 currentBalance = 0;
-        uint256 playersCount = 0;
-        uint256 raffleState = 0;
+        uint256 currentBalance = address(raffle).balance;
+        uint256 playersCount = raffle.getPlayers().length;
+        Raffle.RaffleState raffleState = raffle.getRaffleState();
 
         // Act - Assert
-        vm.expectRevert(abi.encodeWithSelector(Raffle.Raffle__UpkeepNotNeeded.selector, currentBalance, playersCount, raffleState));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Raffle.Raffle__UpkeepNotNeeded.selector,
+                currentBalance,
+                playersCount,
+                raffleState
+            )
+        );
+
         raffle.performUpkeep("");
     }
 
@@ -176,13 +184,20 @@ contract RaffleTest is Test {
         _;
     }
 
+    modifier skipFork() {
+        if (block.chainid != 31337) {
+            return;
+        }
+        _;
+    }
+
     //////////////////////////
     // Fulfill Random Words //
     //////////////////////////
 
     function testFulfillRandomWordsRevertsIfCalledIfCalledBeforePerformUpkeep(
         uint256 randomRequestId
-    ) public raffleEnterAndTimePassed {
+    ) public skipFork raffleEnterAndTimePassed {
         // Arrange
         vm.expectRevert("nonexistent request");
         VRFCoordinatorV2Mock(vrfCoordinator).fulfillRandomWords(
@@ -191,7 +206,7 @@ contract RaffleTest is Test {
         );
     }
 
-    function testFulfillRandomWordsPicksaWinnerResetsAndSendsTheFunds() public raffleEnterAndTimePassed {
+    function testFulfillRandomWordsPicksaWinnerResetsAndSendsTheFunds() public skipFork raffleEnterAndTimePassed {
         // Arrange
         uint256 additionalEntrants = 5;
         uint256 startingIndex = 1;
